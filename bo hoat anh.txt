@@ -1,0 +1,69 @@
+animationEnabled = true
+
+function togglePlayerAnimation()
+    if animationEnabled then
+        player.currentAnimation = "idle"
+    else
+        player.currentAnimation = nil
+    end
+end
+
+function drawGUI()
+    if imgui.Begin("TRAN MINH HUB") then
+        local changed
+        changed, animationEnabled = imgui.Checkbox("Enable Player Animation", animationEnabled)
+        if changed then
+            togglePlayerAnimation()
+        end
+
+        if imgui.Button("Remove Player Animations") then
+            if player.animations then
+                for k,v in pairs(player.animations) do
+                    player.animations[k] = nil
+                end
+                player.currentAnimation = nil
+            end
+        end
+
+        imgui.End()
+    end
+end
+
+function love.update(dt)
+    drawGUI()
+endutton.Text = "Bật GUI"
+toggleButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleButton.Parent = screenGui
+
+local btnCorner = Instance.new("UICorner")
+btnCorner.CornerRadius = UDim.new(0, 8)
+btnCorner.Parent = toggleButton
+
+local label = Instance.new("TextLabel")
+label.Size = UDim2.new(1, 0, 1, 0)
+label.Text = "Animation đã bị xoá!"
+label.BackgroundTransparency = 1
+label.TextColor3 = Color3.fromRGB(255, 255, 255)
+label.TextScaled = true
+label.Parent = frame
+
+local function removeAnimations()
+    local animator = humanoid:FindFirstChildOfClass("Animator")
+    if animator then
+        for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+            track:Stop()
+        end
+    end
+end
+
+frame:GetPropertyChangedSignal("Visible"):Connect(function()
+    if frame.Visible == true then
+        removeAnimations()
+    end
+end)
+
+toggleButton.MouseButton1Click:Connect(function()
+    frame.Visible = not frame.Visible
+    toggleButton.Text = frame.Visible and "Tắt GUI" or "Bật GUI"
+end)
