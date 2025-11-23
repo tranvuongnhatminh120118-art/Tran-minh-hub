@@ -1,0 +1,30 @@
+local button = script.Parent
+local player = game.Players.LocalPlayer
+
+local isInvisible = false
+
+button.Text = "TMH BẬT"
+
+local function setInvisible(state)
+    local char = player.Character or player.CharacterAdded:Wait()
+
+    for _, part in ipairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.LocalTransparencyModifier = state and 1 or 0
+        elseif part:IsA("Decal") then
+            part.Transparency = state and 1 or 0
+        end
+    end
+end
+
+button.MouseButton1Click:Connect(function()
+    isInvisible = not isInvisible
+
+    if isInvisible then
+        setInvisible(true)
+        button.Text = "TMH TẮT"
+    else
+        setInvisible(false)
+        button.Text = "TMH BẬT"
+    end
+end)
