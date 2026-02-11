@@ -112,7 +112,7 @@ local SPEED = 50
 
 pcall(function()
 
-	if lp.PlayerGui:FindFirstChild("Orrxl4BatTarget") then		lp.PlayerGui.Orrxl4BatTarget:Destroy()
+	if lp.PlayerGui:FindFirstChild("MIZABatTarget") then		lp.PlayerGui.MIZABatTarget:Destroy()
 
 	end
 
@@ -120,7 +120,7 @@ end)
 
 local gui = Instance.new("ScreenGui")
 
-gui.Name = "Orrxl4BatTarget"
+gui.Name = "MIZABatTarget"
 
 gui.ResetOnSpawn = false
 
@@ -218,7 +218,7 @@ local dvd = Instance.new("TextLabel")
 
 dvd.Parent = frame
 
-dvd.Text = "Orrxl4"
+dvd.Text = "MIZA HUB"
 
 dvd.Font = Enum.Font.GothamBlack
 
@@ -458,7 +458,7 @@ local function start()
 
 		if not targetPlayer then
 
-			targetLbl.Text = "Target: None"
+			targetLbl.Text = "https://discord.gg/tR8jXqrmc"
 
 			lv.Enabled = false
 
