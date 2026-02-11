@@ -1,0 +1,591 @@
+-- 1️⃣ KHAI BÁO KEY & LINK GET KEY
+local key = "MIZAVIPPRO" -- Key bạn đặt
+local keyLink = "https://discord.gg/tR8jXqrmc" -- Link khi ấn "Get Key"
+
+-- 2️⃣ GIAO DIỆN NHẬP KEY
+local CoreGui = game:GetService("CoreGui")
+local ScreenGui = Instance.new("ScreenGui")
+local Frame = Instance.new("Frame")
+local TextBox = Instance.new("TextBox")
+local CheckButton = Instance.new("TextButton")
+local GetKeyButton = Instance.new("TextButton")
+local UICorner = Instance.new("UICorner")
+
+ScreenGui.Name = "MIZA GET KEY"
+ScreenGui.Parent = CoreGui
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+Frame.Parent = ScreenGui
+Frame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+Frame.Size = UDim2.new(0, 300, 0, 160)
+Frame.Position = UDim2.new(0.5, -150, 0.5, -80)
+UICorner.Parent = Frame
+
+-- 🔴 Nút thoát (dấu X)
+local CloseButton = Instance.new("TextButton")
+CloseButton.Parent = Frame
+CloseButton.Text = "X"
+CloseButton.Size = UDim2.new(0, 25, 0, 25)
+CloseButton.Position = UDim2.new(1, -30, 0, 5) -- góc phải trên khung
+CloseButton.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
+CloseButton.TextColor3 = Color3.fromRGB(255,255,255)
+CloseButton.Font = Enum.Font.SourceSansBold
+CloseButton.TextSize = 18
+
+local closeCorner = Instance.new("UICorner", CloseButton)
+closeCorner.CornerRadius = UDim.new(0, 5)
+
+CloseButton.MouseButton1Click:Connect(function()
+	ScreenGui:Destroy() -- ấn X sẽ tắt giao diện
+end)
+TextBox.Parent = Frame
+TextBox.PlaceholderText = " KEY "
+TextBox.Text = ""
+TextBox.Size = UDim2.new(0.9, 0, 0, 35)
+TextBox.Position = UDim2.new(0.05, 0, 0.25, 0)
+TextBox.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+TextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+UICorner:Clone().Parent = TextBox
+
+CheckButton.Parent = Frame
+CheckButton.Text = "Check Key"
+CheckButton.Size = UDim2.new(0.4, 0, 0, 30)
+CheckButton.Position = UDim2.new(0.05, 0, 0.65, 0)
+CheckButton.BackgroundColor3 = Color3.fromRGB(80, 170, 80)
+UICorner:Clone().Parent = CheckButton
+
+GetKeyButton.Parent = Frame
+GetKeyButton.Text = "Get Key"
+GetKeyButton.Size = UDim2.new(0.4, 0, 0, 30)
+GetKeyButton.Position = UDim2.new(0.55, 0, 0.65, 0)
+GetKeyButton.BackgroundColor3 = Color3.fromRGB(100, 100, 255)
+UICorner:Clone().Parent = GetKeyButton
+
+GetKeyButton.MouseButton1Click:Connect(function()
+	setclipboard(keyLink)
+	game.StarterGui:SetCore("SendNotification", {
+		Title = "copied successfully";
+		Text = "Paste it in your browser to get the key";
+		Duration = 4;
+	})
+end)
+
+local keyOk = false
+CheckButton.MouseButton1Click:Connect(function()
+	if TextBox.Text == key then
+		keyOk = true
+		ScreenGui:Destroy()
+		game.StarterGui:SetCore("SendNotification", {
+			Title = "successful";
+			Text = "If successful, please wait 3-5 seconds";
+			Duration = 3;
+		})
+	else
+		game.StarterGui:SetCore("SendNotification", {
+			Title = "wrong key";
+			Text = "Or press get key to get another key";
+			Duration = 3;
+		})
+	end
+end)
+
+-- 3️⃣ CHỜ NHẬP KEY ĐÚNG MỚI CHẠY SCRIPT CHÍNH
+repeat task.wait() until keyOk == true
+
+-- 👉 DÁN CODE CHÍNH CỦA BẠN NGAY DƯỚI DÒNG NÀY 👇
+------------------------------------------------------
+-- ↓ TOÀN BỘ CODE CỦA BẠN (bắt đầu từ dòng: local ScreenGui = Instance.new("ScreenGui"))
+
+local Players = game:GetService("Players")
+
+local RunService = game:GetService("RunService")
+
+local TweenService = game:GetService("TweenService")
+
+local UIS = game:GetService("UserInputService")
+
+local lp = Players.LocalPlayer
+
+local RADIUS = 50
+
+local SPEED = 50
+
+pcall(function()
+
+	if lp.PlayerGui:FindFirstChild("Orrxl4BatTarget") then		lp.PlayerGui.Orrxl4BatTarget:Destroy()
+
+	end
+
+end)
+
+local gui = Instance.new("ScreenGui")
+
+gui.Name = "Orrxl4BatTarget"
+
+gui.ResetOnSpawn = false
+
+gui.Parent = lp.PlayerGui
+
+local frame = Instance.new("Frame")
+
+frame.Parent = gui
+
+frame.Size = UDim2.new(0,220,0,155)
+
+frame.Position = UDim2.new(0.5,0,0.55,0)
+
+frame.AnchorPoint = Vector2.new(0.5,0.5)
+
+frame.BackgroundColor3 = Color3.fromRGB(14,20,40)
+
+frame.BackgroundTransparency = 1
+
+frame.Active = true
+
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0,14)
+
+local stroke = Instance.new("UIStroke", frame)
+
+stroke.Color = Color3.fromRGB(0,140,255)
+
+stroke.Thickness = 1.4
+
+stroke.Transparency = 1
+
+TweenService:Create(frame, TweenInfo.new(0.4, Enum.EasingStyle.Back), {
+
+	BackgroundTransparency = 0
+
+}):Play()
+
+TweenService:Create(stroke, TweenInfo.new(0.4), {
+
+	Transparency = 0.25
+
+}):Play()
+
+do
+
+	local dragging = false
+
+	local startPos, startGui
+
+	frame.InputBegan:Connect(function(i)
+
+		if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+
+			dragging = true
+
+			startPos = i.Position
+
+			startGui = frame.Position
+
+		end
+
+	end)
+
+	frame.InputEnded:Connect(function(i)
+
+		if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+
+			dragging = false
+
+		end
+
+	end)
+
+	UIS.InputChanged:Connect(function(i)
+
+		if dragging then
+
+			local d = i.Position - startPos
+
+			frame.Position = UDim2.new(
+
+				startGui.X.Scale, startGui.X.Offset + d.X,
+
+				startGui.Y.Scale, startGui.Y.Offset + d.Y
+
+			)
+
+		end
+
+	end)
+
+end
+
+local dvd = Instance.new("TextLabel")
+
+dvd.Parent = frame
+
+dvd.Text = "Orrxl4"
+
+dvd.Font = Enum.Font.GothamBlack
+
+dvd.TextSize = 18
+
+dvd.TextColor3 = Color3.fromRGB(0,160,255)
+
+dvd.BackgroundTransparency = 1
+
+dvd.Size = UDim2.new(0,70,0,24)
+
+dvd.Position = UDim2.fromOffset(6,6)
+
+local dvdVel = Vector2.new(1.4,1.4)
+
+RunService.RenderStepped:Connect(function()
+
+	local fs = frame.AbsoluteSize
+
+	local ds = dvd.AbsoluteSize
+
+	local p = Vector2.new(dvd.Position.X.Offset, dvd.Position.Y.Offset) + dvdVel
+
+	if p.X <= 4 or p.X + ds.X >= fs.X - 4 then
+
+		dvdVel = Vector2.new(-dvdVel.X, dvdVel.Y)
+
+	end
+
+	if p.Y <= 4 or p.Y + ds.Y >= fs.Y - 4 then
+
+		dvdVel = Vector2.new(dvdVel.X, -dvdVel.Y)
+
+	end
+
+	dvd.Position = UDim2.fromOffset(
+
+		math.clamp(p.X, 4, fs.X - ds.X - 4),
+
+		math.clamp(p.Y, 4, fs.Y - ds.Y - 4)
+
+	)
+
+end)
+
+local title = Instance.new("TextLabel")
+
+title.Parent = frame
+
+title.Size = UDim2.new(1,-20,0,30)
+
+title.Position = UDim2.new(0,10,0,10)
+
+title.BackgroundColor3 = Color3.fromRGB(22,36,72)
+
+title.Text = "Bat Target"
+
+title.Font = Enum.Font.GothamBold
+
+title.TextSize = 14
+
+title.TextColor3 = Color3.fromRGB(230,240,255)
+
+Instance.new("UICorner", title).CornerRadius = UDim.new(0,10)
+
+local btn = Instance.new("TextButton")
+
+btn.Parent = frame
+
+btn.Size = UDim2.new(1,-40,0,38)
+
+btn.Position = UDim2.new(0,20,0,70)
+
+btn.Text = "AUTO BAT"
+
+btn.Font = Enum.Font.GothamBold
+
+btn.TextSize = 14
+
+btn.TextColor3 = Color3.new(1,1,1)
+
+btn.BackgroundColor3 = Color3.fromRGB(200,50,60)
+
+btn.AutoButtonColor = false
+
+Instance.new("UICorner", btn).CornerRadius = UDim.new(0,12)
+
+local grad = Instance.new("UIGradient", btn)
+
+grad.Color = ColorSequence.new{
+
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(255,120,120)),
+
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(150,30,40))
+
+}
+
+grad.Rotation = 90
+
+local targetLbl = Instance.new("TextLabel")
+
+targetLbl.Parent = frame
+
+targetLbl.Size = UDim2.new(1,-40,0,20)
+
+targetLbl.Position = UDim2.new(0,20,0,118)
+
+targetLbl.BackgroundTransparency = 1
+
+targetLbl.Text = "Target: None"
+
+targetLbl.Font = Enum.Font.Gotham
+
+targetLbl.TextSize = 12
+
+targetLbl.TextColor3 = Color3.fromRGB(190,205,235)
+
+targetLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+local enabled = false
+
+local hbConn
+
+local lv, att, gyro
+
+local function getNearest()
+
+	local char = lp.Character
+
+	if not char then return nil end
+
+	local hrp = char:FindFirstChild("HumanoidRootPart")
+
+	if not hrp then return nil end
+
+	local nearest = nil
+
+	local nearestDist = RADIUS
+
+	for _,plr in ipairs(Players:GetPlayers()) do
+
+		if plr ~= lp then
+
+			local pc = plr.Character
+
+			local phrp = pc and pc:FindFirstChild("HumanoidRootPart")
+
+			if phrp then
+
+				local d = (phrp.Position - hrp.Position).Magnitude
+
+				if d <= nearestDist then
+
+					nearest = plr
+
+					nearestDist = d
+
+				end
+
+			end
+
+		end
+
+	end
+
+	return nearest
+
+end
+
+local function getBat()
+
+	for _,t in ipairs(lp.Backpack:GetChildren()) do
+
+		if t:IsA("Tool") and string.find(string.lower(t.Name),"bat",1,true) then
+
+			return t
+
+		end
+
+	end
+
+	local char = lp.Character
+
+	if char then
+
+		for _,t in ipairs(char:GetChildren()) do
+
+			if t:IsA("Tool") and string.find(string.lower(t.Name),"bat",1,true) then
+
+				return t
+
+			end
+
+		end
+
+	end
+
+	return nil
+
+end
+
+local function start()
+
+	local char = lp.Character
+
+	if not char then return end
+
+	local hrp = char:FindFirstChild("HumanoidRootPart")
+
+	if not hrp then return end
+
+	att = Instance.new("Attachment", hrp)
+
+	lv = Instance.new("LinearVelocity", hrp)
+
+	lv.Attachment0 = att
+
+	lv.MaxForce = 50000
+
+	lv.RelativeTo = Enum.ActuatorRelativeTo.World
+
+	lv.Enabled = false
+
+	gyro = Instance.new("AlignOrientation", hrp)
+
+	gyro.Attachment0 = att
+
+	gyro.MaxTorque = 50000
+
+	gyro.Responsiveness = 120
+
+	gyro.Enabled = false
+
+	hbConn = RunService.Heartbeat:Connect(function()
+
+		local targetPlayer = getNearest()
+
+		if not targetPlayer then
+
+			targetLbl.Text = "Target: None"
+
+			lv.Enabled = false
+
+			gyro.Enabled = false
+
+			return
+
+		end
+
+		local tChar = targetPlayer.Character
+
+		local tHrp = tChar and tChar:FindFirstChild("HumanoidRootPart")
+
+		if not tHrp then
+
+			targetLbl.Text = "Target: None"
+
+			lv.Enabled = false
+
+			gyro.Enabled = false
+
+			return
+
+		end
+
+		targetLbl.Text = "Target: "..targetPlayer.Name
+
+		lv.Enabled = true
+
+		gyro.Enabled = true
+
+		local behindPos = tHrp.Position - tHrp.CFrame.LookVector * 2.2
+
+		local dir = behindPos - hrp.Position
+
+		if dir.Magnitude > 0.5 then
+
+			lv.VectorVelocity = dir.Unit * SPEED
+
+		else
+
+			lv.VectorVelocity = Vector3.zero
+
+		end
+
+		gyro.CFrame = CFrame.lookAt(hrp.Position, behindPos)
+
+		local bat = getBat()
+
+		if bat then
+
+			if bat.Parent ~= char then
+
+				char.Humanoid:EquipTool(bat)
+
+			end
+
+			bat:Activate()
+
+		end
+
+	end)
+
+end
+
+local function stop()
+
+	if hbConn then hbConn:Disconnect() hbConn = nil end
+
+	if lv then lv:Destroy() lv = nil end
+
+	if gyro then gyro:Destroy() gyro = nil end
+
+	if att then att:Destroy() att = nil end
+
+	targetLbl.Text = "Target: None"
+
+end
+
+btn.MouseButton1Click:Connect(function()
+
+	enabled = not enabled
+
+	if enabled then
+
+		btn.Text = "AUTO BAT ON"
+
+		btn.BackgroundColor3 = Color3.fromRGB(60,200,120)
+
+		grad.Color = ColorSequence.new{
+
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(120,255,190)),
+
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(40,160,90))
+
+		}
+
+		start()
+
+	else
+
+		btn.Text = "AUTO BAT"
+
+		btn.BackgroundColor3 = Color3.fromRGB(200,50,60)
+
+		grad.Color = ColorSequence.new{
+
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(255,120,120)),
+
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(150,30,40))
+
+		}
+
+		stop()
+
+	end
+
+end)
+
+lp.CharacterAdded:Connect(function()
+
+	task.wait(0.2)
+
+	if enabled then
+
+		start()
+
+	end
+
+end)
