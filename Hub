@@ -1,0 +1,681 @@
+local player = game.Players.LocalPlayer
+local char = player.Character or player.CharacterAdded:Wait()
+local rootPart = char:WaitForChild("HumanoidRootPart")
+local runService = game:GetService("RunService")
+local tweenService = game:GetService("TweenService")
+local replicatedStorage = game:GetService("ReplicatedStorage")
+
+local spinRemote = replicatedStorage:WaitForChild("Packages"):WaitForChild("Net"):WaitForChild("RF/WheelSpin.Roll")
+local autoSpinEnabled = false
+local bringCoinsEnabled = false
+local autoCollectEnabled = false
+local bringConnection = nil
+local isCollecting = false
+local startCoords = Vector3.new(150.61, 12.81, 0.36)
+local safeZoneConnection = nil
+local safePlatforms = {}
+local collectLoopRunning = false
+
+local platformData = {
+    {name = "Common", coords = {183.57, 217.82}, y = 0.27},
+    {name = "Uncommon", coords = {266.22, 301.67}, y = 0.27},
+    {name = "Rare", coords = {381.17, 415.90}, y = 0.27},
+    {name = "Epic", coords = {525.13, 559.02}, y = 0.27},
+    {name = "Legendary", coords = {738.04, 773.05}, y = 0.27},
+    {name = "Mythical", coords = {1048.12, 1099.11}, y = 0.27},
+    {name = "Cosmic", coords = {1511.37, 1598.87}, y = 0.27},
+    {name = "Secret", coords = {2199.54, 2311.23}, y = 0.27},
+    {name = "Celestial", coords = {2555.19, 2665.67}, y = 0.27}
+}
+
+local function createPlatforms()
+    for _, data in ipairs(platformData) do
+        local x1, x2 = data.coords[1], data.coords[2]
+        local centerX = (x1 + x2) / 2
+        local widthX = math.abs(x2 - x1)
+        
+        local name = "Zone_" .. data.name
+        if workspace:FindFirstChild(name) then workspace[name]:Destroy() end
+
+        local platform = Instance.new("Part")
+        platform.Name = name
+        platform.Size = Vector3.new(widthX, 0.5, 999999)
+        platform.Position = Vector3.new(centerX, 0.27, 0)
+        platform.Anchored = true
+        platform.CanCollide = false
+        platform.Material = Enum.Material.Neon
+        platform.Color = Color3.fromRGB(0, 255, 100)
+        platform.Transparency = 1
+        platform.Parent = workspace
+        
+        table.insert(safePlatforms, platform)
+    end
+end
+
+local function deletePlatforms()
+    for _, platform in ipairs(safePlatforms) do
+        if platform and platform.Parent then
+            platform:Destroy()
+        end
+    end
+    safePlatforms = {}
+end
+
+local function deleteHitboxes()
+    local activeTsunamis = workspace:FindFirstChild("ActiveTsunamis")
+    if activeTsunamis then
+        for _, wave in pairs(activeTsunamis:GetChildren()) do
+            local hitbox = wave:FindFirstChild("Hitbox")
+            if hitbox then
+                hitbox:Destroy()
+            end
+        end
+    end
+end
+
+local function parseRateValue(rateText)
+    if not rateText then return 0 end
+    rateText = rateText:gsub("%s+", ""):upper()
+    local number = tonumber(rateText:match("%d+%.?%d*"))
+    if not number then return 0 end
+    local suffix = rateText:match("[KMBT]")
+    local multipliers = {K = 1000, M = 1000000, B = 1000000000, T = 1000000000000}
+    if suffix and multipliers[suffix] then
+        return number * multipliers[suffix]
+    end
+    return number
+end
+
+local function getHighestRateBrainrot()
+    local activeBrainrots = workspace:FindFirstChild("ActiveBrainrots")
+    if not activeBrainrots then return nil, nil, nil end
+    
+    local rarities = {"Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythical", "Cosmic", "Secret", "Celestial"}
+    local highestRate, bestBrainrot, bestContainer, bestRarity = 0, nil, nil, nil
+    
+    for _, rarity in pairs(rarities) do
+        local rarityFolder = activeBrainrots:FindFirstChild(rarity)
+        if rarityFolder then
+            for _, container in pairs(rarityFolder:GetChildren()) do
+                for _, brainrot in pairs(container:GetChildren()) do
+                    if brainrot:IsA("Model") then
+                        local modelExtents = brainrot:FindFirstChild("ModelExtents")
+                        if modelExtents then
+                            local statsGui = modelExtents:FindFirstChild("StatsGui")
+                            if statsGui then
+                                local frame = statsGui:FindFirstChild("Frame")
+                                if frame then
+                                    local rateLabel = frame:FindFirstChild("Rate")
+                                    if rateLabel and rateLabel:IsA("TextLabel") then
+                                        local rate = parseRateValue(rateLabel.Text)
+                                        if rate > highestRate then
+                                            highestRate = rate
+                                            bestBrainrot = brainrot
+                                            bestContainer = container
+                                            bestRarity = rarity
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    return bestBrainrot, bestContainer, bestRarity
+end
+
+local function getAllTsunamiPositions()
+    local tsunamis = {}
+    local activeTsunamis = workspace:FindFirstChild("ActiveTsunamis")
+    if not activeTsunamis then return tsunamis end
+    
+    for _, wave in pairs(activeTsunamis:GetChildren()) do
+        if wave:IsA("Model") or wave:IsA("Folder") then
+            local hitbox = wave:FindFirstChild("Hitbox")
+            if not hitbox then
+                for _, child in pairs(wave:GetChildren()) do
+                    if child.Name == "Hitbox" or child:IsA("BasePart") then
+                        hitbox = child
+                        break
+                    end
+                end
+            end
+            
+            if hitbox and hitbox:IsA("BasePart") then
+                table.insert(tsunamis, {
+                    position = hitbox.Position,
+                    size = hitbox.Size,
+                    wave = wave
+                })
+            elseif wave.PrimaryPart then
+                table.insert(tsunamis, {
+                    position = wave.PrimaryPart.Position,
+                    size = wave.PrimaryPart.Size,
+                    wave = wave
+                })
+            end
+        end
+    end
+    
+    return tsunamis
+end
+
+local function isTsunamiBetween(posA, posB)
+    local tsunamis = getAllTsunamiPositions()
+    
+    if #tsunamis == 0 then return false end
+    
+    local minX = math.min(posA.X, posB.X) - 50
+    local maxX = math.max(posA.X, posB.X) + 50
+    
+    for _, tsunami in pairs(tsunamis) do
+        local waveX = tsunami.position.X
+        local waveSize = tsunami.size.X / 2
+        
+        if (waveX - waveSize) <= maxX and (waveX + waveSize) >= minX then
+            return true, waveX
+        end
+    end
+    
+    return false
+end
+
+local function isTsunamiBehind(currentPos, threshold)
+    local tsunamis = getAllTsunamiPositions()
+    
+    if #tsunamis == 0 then return false end
+    
+    threshold = threshold or 150
+    
+    for _, tsunami in pairs(tsunamis) do
+        local waveX = tsunami.position.X
+        local distance = currentPos.X - waveX
+        
+        if distance > 0 and distance < threshold then
+            return true, distance
+        end
+    end
+    
+    return false
+end
+
+local function waitForSafePath(fromPos, toPos)
+    local maxWaitTime = 45
+    local startTime = tick()
+    
+    while autoCollectEnabled and (tick() - startTime) < maxWaitTime do
+        if not rootPart or not rootPart.Parent then
+            return false
+        end
+        
+        local hasTsunamiBetween = isTsunamiBetween(fromPos, toPos)
+        local hasTsunamiBehind = isTsunamiBehind(fromPos, 150)
+        
+        if not hasTsunamiBetween and not hasTsunamiBehind then
+            return true
+        end
+        
+        task.wait(0.25)
+    end
+    
+    return false
+end
+
+local function tweenToPosition(targetPos, speed)
+    if not rootPart or not rootPart.Parent then return end
+    
+    speed = (speed or 1599) * 1.15
+    
+    local distance = (rootPart.Position - targetPos).Magnitude
+    local duration = distance / speed
+    
+    local tween = tweenService:Create(
+        rootPart,
+        TweenInfo.new(duration, Enum.EasingStyle.Linear),
+        {CFrame = CFrame.new(targetPos)}
+    )
+    
+    tween:Play()
+    
+    local startTime = tick()
+    local startPos = rootPart.Position
+    
+    task.spawn(function()
+        while tween.PlaybackState == Enum.PlaybackState.Playing and rootPart and rootPart.Parent do
+            local elapsed = tick() - startTime
+            local progress = math.min(elapsed / duration, 1)
+            
+            if progress > 0 and progress < 1 then
+                local currentPos = rootPart.Position
+                local targetDirection = (targetPos - startPos).Unit
+                local microTPDistance = 15
+                local microTPPos = currentPos + (targetDirection * microTPDistance)
+                
+                rootPart.CFrame = CFrame.new(microTPPos)
+            end
+            
+            task.wait(0.1)
+        end
+    end)
+    
+    tween.Completed:Wait()
+end
+
+local function getPlatformCenter(platformIndex)
+    local data = platformData[platformIndex]
+    if not data then return nil end
+    
+    local x1, x2 = data.coords[1], data.coords[2]
+    local centerX = (x1 + x2) / 2
+    return Vector3.new(centerX, data.y, 0)
+end
+
+local function getPlatformIndexForX(x)
+    for i, data in ipairs(platformData) do
+        if x >= data.coords[1] and x <= data.coords[2] then
+            return i
+        end
+    end
+    local closest = 1
+    local minDist = math.abs(x - (platformData[1].coords[1] + platformData[1].coords[2]) / 2)
+    
+    for i, data in ipairs(platformData) do
+        local centerX = (data.coords[1] + data.coords[2]) / 2
+        local dist = math.abs(x - centerX)
+        if dist < minDist then
+            minDist = dist
+            closest = i
+        end
+    end
+    
+    return closest
+end
+
+local function returnToStart()
+    if not rootPart or not rootPart.Parent then return end
+    
+    local maxAttempts = 10
+    local attempts = 0
+    
+    while autoCollectEnabled and attempts < maxAttempts do
+        if not rootPart or not rootPart.Parent then return end
+        
+        local currentX = rootPart.Position.X
+        local currentPlatformIndex = getPlatformIndexForX(currentX)
+        local startPlatformIndex = getPlatformIndexForX(startCoords.X)
+        
+        if currentPlatformIndex <= startPlatformIndex then
+            if waitForSafePath(rootPart.Position, startCoords) then
+                tweenToPosition(startCoords, 1599)
+            end
+            return
+        else
+            local prevPlatformIndex = currentPlatformIndex - 1
+            local platformPos = getPlatformCenter(prevPlatformIndex)
+            
+            if platformPos then
+                if not waitForSafePath(rootPart.Position, platformPos) then
+                    return
+                end
+                
+                tweenToPosition(platformPos, 1599)
+                task.wait(0.15)
+            else
+                return
+            end
+        end
+        
+        attempts = attempts + 1
+    end
+end
+
+local function collectBrainrot()
+    if isCollecting or not autoCollectEnabled then return end
+    isCollecting = true
+    
+    if not rootPart or not rootPart.Parent then
+        isCollecting = false
+        return
+    end
+    
+    local currentTarget = nil
+    local targetUpdateConnection = nil
+    local collectedSuccessfully = false
+    
+    local function updateTarget()
+        local newBest, newContainer, newRarity = getHighestRateBrainrot()
+        if newBest and newContainer then
+            local newRoot = newContainer:FindFirstChild("Root")
+            if newRoot then
+                if not currentTarget or currentTarget.root ~= newRoot then
+                    currentTarget = {
+                        brainrot = newBest,
+                        container = newContainer,
+                        root = newRoot,
+                        rarity = newRarity
+                    }
+                    return true
+                end
+            end
+        end
+        return false
+    end
+    
+    updateTarget()
+    
+    if not currentTarget then
+        isCollecting = false
+        return
+    end
+    
+    targetUpdateConnection = runService.Heartbeat:Connect(function()
+        if autoCollectEnabled then
+            updateTarget()
+        end
+    end)
+    
+    while autoCollectEnabled and currentTarget do
+        if not rootPart or not rootPart.Parent then
+            break
+        end
+        
+        local targetX = currentTarget.root.Position.X
+        local currentPlatformIndex = getPlatformIndexForX(rootPart.Position.X)
+        local targetPlatformIndex = getPlatformIndexForX(targetX)
+        
+        if targetPlatformIndex > currentPlatformIndex then
+            local nextPlatformIndex = currentPlatformIndex + 1
+            local platformPos = getPlatformCenter(nextPlatformIndex)
+            
+            if platformPos then
+                if not waitForSafePath(rootPart.Position, platformPos) then
+                    break
+                end
+                
+                if autoCollectEnabled and rootPart and rootPart.Parent then
+                    tweenToPosition(platformPos, 1599)
+                    task.wait(0.15)
+                end
+            end
+        elseif currentPlatformIndex >= targetPlatformIndex then
+            if not waitForSafePath(rootPart.Position, currentTarget.root.Position) then
+                break
+            else
+                tweenToPosition(currentTarget.root.Position, 1599)
+                task.wait(0.2)
+                
+                local finalCheck, finalContainer = getHighestRateBrainrot()
+                if finalCheck and finalContainer then
+                    local finalRoot = finalContainer:FindFirstChild("Root")
+                    if finalRoot and finalRoot == currentTarget.root then
+                        local takePrompt = finalRoot:FindFirstChild("TakePrompt")
+                        if takePrompt and takePrompt:IsA("ProximityPrompt") then
+                            takePrompt.HoldDuration = 0
+                            takePrompt.MaxActivationDistance = 9999
+                            fireproximityprompt(takePrompt)
+                            task.wait(0.3)
+                            collectedSuccessfully = true
+                        end
+                    else
+                        updateTarget()
+                        continue
+                    end
+                end
+                
+                break
+            end
+        end
+    end
+    
+    if targetUpdateConnection then
+        targetUpdateConnection:Disconnect()
+    end
+    
+    if collectedSuccessfully and autoCollectEnabled then
+        returnToStart()
+    end
+    
+    isCollecting = false
+end
+
+local function startCollectLoop()
+    if collectLoopRunning then return end
+    collectLoopRunning = true
+    
+    task.spawn(function()
+        while autoCollectEnabled and collectLoopRunning do
+            if char and char.Parent and rootPart and rootPart.Parent then
+                if not isCollecting then
+                    collectBrainrot()
+                end
+            end
+            task.wait(1.5)
+        end
+        collectLoopRunning = false
+    end)
+end
+
+local function stopCollectLoop()
+    collectLoopRunning = false
+    isCollecting = false
+end
+
+local function bringItems()
+    local character = player.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    local eventParts = workspace:FindFirstChild("EventParts")
+
+    if root and eventParts then
+        local targetCFrame = root.CFrame * CFrame.new(0, 5, 0)
+        for _, item in pairs(eventParts:GetChildren()) do
+            if item:IsA("BasePart") then
+                item.CFrame = targetCFrame
+            elseif item:IsA("Model") and item.PrimaryPart then
+                item:SetPrimaryPartCFrame(targetCFrame)
+            end
+        end
+    end
+end
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "IceHubUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = player.PlayerGui
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 200, 0, 210)
+mainFrame.Position = UDim2.new(1, -210, 0, 10)
+mainFrame.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
+mainFrame.BorderSizePixel = 0
+mainFrame.Parent = screenGui
+
+local mainCorner = Instance.new("UICorner")
+mainCorner.CornerRadius = UDim.new(0, 12)
+mainCorner.Parent = mainFrame
+
+local border = Instance.new("UIStroke")
+border.Color = Color3.fromRGB(0, 200, 255)
+border.Thickness = 2
+border.Transparency = 0.3
+border.Parent = mainFrame
+
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(1, -20, 0, 35)
+titleLabel.Position = UDim2.new(0, 10, 0, 8)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "Ice Hub EA"
+titleLabel.TextColor3 = Color3.fromRGB(0, 200, 255)
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.TextSize = 18
+titleLabel.TextXAlignment = Enum.TextXAlignment.Center
+titleLabel.Parent = mainFrame
+
+local divider = Instance.new("Frame")
+divider.Size = UDim2.new(1, -20, 0, 1)
+divider.Position = UDim2.new(0, 10, 0, 45)
+divider.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
+divider.BorderSizePixel = 0
+divider.Transparency = 0.5
+divider.Parent = mainFrame
+
+local autoSpinLabel = Instance.new("TextLabel")
+autoSpinLabel.Size = UDim2.new(0.65, 0, 0, 30)
+autoSpinLabel.Position = UDim2.new(0, 15, 0, 55)
+autoSpinLabel.BackgroundTransparency = 1
+autoSpinLabel.Text = "Auto Spin"
+autoSpinLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+autoSpinLabel.Font = Enum.Font.GothamBold
+autoSpinLabel.TextSize = 13
+autoSpinLabel.TextXAlignment = Enum.TextXAlignment.Left
+autoSpinLabel.Parent = mainFrame
+
+local spinToggle = Instance.new("TextButton")
+spinToggle.Size = UDim2.new(0, 22, 0, 22)
+spinToggle.Position = UDim2.new(1, -37, 0, 59)
+spinToggle.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
+spinToggle.Text = ""
+spinToggle.Parent = mainFrame
+
+local spinCorner = Instance.new("UICorner")
+spinCorner.CornerRadius = UDim.new(0, 5)
+spinCorner.Parent = spinToggle
+
+spinToggle.MouseButton1Click:Connect(function()
+    autoSpinEnabled = not autoSpinEnabled
+    if autoSpinEnabled then
+        tweenService:Create(spinToggle, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(0, 200, 255)}):Play()
+    else
+        tweenService:Create(spinToggle, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(20, 20, 28)}):Play()
+    end
+end)
+
+local bringCoinsLabel = Instance.new("TextLabel")
+bringCoinsLabel.Size = UDim2.new(0.65, 0, 0, 30)
+bringCoinsLabel.Position = UDim2.new(0, 15, 0, 92)
+bringCoinsLabel.BackgroundTransparency = 1
+bringCoinsLabel.Text = "Bring Coins"
+bringCoinsLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+bringCoinsLabel.Font = Enum.Font.GothamBold
+bringCoinsLabel.TextSize = 13
+bringCoinsLabel.TextXAlignment = Enum.TextXAlignment.Left
+bringCoinsLabel.Parent = mainFrame
+
+local coinsToggle = Instance.new("TextButton")
+coinsToggle.Size = UDim2.new(0, 22, 0, 22)
+coinsToggle.Position = UDim2.new(1, -37, 0, 96)
+coinsToggle.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
+coinsToggle.Text = ""
+coinsToggle.Parent = mainFrame
+
+local coinsCorner = Instance.new("UICorner")
+coinsCorner.CornerRadius = UDim.new(0, 5)
+coinsCorner.Parent = coinsToggle
+
+coinsToggle.MouseButton1Click:Connect(function()
+    bringCoinsEnabled = not bringCoinsEnabled
+    if bringCoinsEnabled then
+        tweenService:Create(coinsToggle, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(0, 200, 255)}):Play()
+        bringConnection = runService.RenderStepped:Connect(bringItems)
+    else
+        tweenService:Create(coinsToggle, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(20, 20, 28)}):Play()
+        if bringConnection then
+            bringConnection:Disconnect()
+            bringConnection = nil
+        end
+    end
+end)
+
+local autoCollectLabel = Instance.new("TextLabel")
+autoCollectLabel.Size = UDim2.new(0.65, 0, 0, 30)
+autoCollectLabel.Position = UDim2.new(0, 15, 0, 129)
+autoCollectLabel.BackgroundTransparency = 1
+autoCollectLabel.Text = "Auto Collect Best"
+autoCollectLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+autoCollectLabel.Font = Enum.Font.GothamBold
+autoCollectLabel.TextSize = 13
+autoCollectLabel.TextXAlignment = Enum.TextXAlignment.Left
+autoCollectLabel.Parent = mainFrame
+
+local collectToggle = Instance.new("TextButton")
+collectToggle.Size = UDim2.new(0, 22, 0, 22)
+collectToggle.Position = UDim2.new(1, -37, 0, 133)
+collectToggle.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
+collectToggle.Text = ""
+collectToggle.Parent = mainFrame
+
+local collectCorner = Instance.new("UICorner")
+collectCorner.CornerRadius = UDim.new(0, 5)
+collectCorner.Parent = collectToggle
+
+collectToggle.MouseButton1Click:Connect(function()
+    autoCollectEnabled = not autoCollectEnabled
+    
+    if autoCollectEnabled then
+        tweenService:Create(collectToggle, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(0, 200, 255)}):Play()
+        
+        createPlatforms()
+        
+        safeZoneConnection = runService.Heartbeat:Connect(function()
+            deleteHitboxes()
+        end)
+        
+        startCollectLoop()
+    else
+        tweenService:Create(collectToggle, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(20, 20, 28)}):Play()
+        
+        stopCollectLoop()
+        
+        deletePlatforms()
+        
+        if safeZoneConnection then
+            safeZoneConnection:Disconnect()
+            safeZoneConnection = nil
+        end
+    end
+end)
+
+local creditLabel = Instance.new("TextLabel")
+creditLabel.Size = UDim2.new(1, -20, 0, 25)
+creditLabel.Position = UDim2.new(0, 10, 1, -30)
+creditLabel.BackgroundTransparency = 1
+creditLabel.Text = "By Euqwj"
+creditLabel.TextColor3 = Color3.fromRGB(0, 200, 255)
+creditLabel.Font = Enum.Font.GothamBold
+creditLabel.TextSize = 11
+creditLabel.TextXAlignment = Enum.TextXAlignment.Center
+creditLabel.Parent = mainFrame
+
+runService.Heartbeat:Connect(function()
+    if autoSpinEnabled then
+        pcall(function()
+            spinRemote:InvokeServer()
+        end)
+    end
+end)
+
+player.CharacterAdded:Connect(function(newChar)
+    char = newChar
+    rootPart = newChar:WaitForChild("HumanoidRootPart")
+    isCollecting = false
+    
+    if autoCollectEnabled then
+        stopCollectLoop()
+        
+        deletePlatforms()
+        task.wait(0.5)
+        createPlatforms()
+        
+        if safeZoneConnection then
+            safeZoneConnection:Disconnect()
+        end
+        safeZoneConnection = runService.Heartbeat:Connect(function()
+            deleteHitboxes()
+        end)
+        
+        task.wait(1)
+        startCollectLoop()
+    end
+end)
